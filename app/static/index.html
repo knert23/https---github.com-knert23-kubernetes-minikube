@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6fb">
+  <title>Cloud Storage — S3</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6fb;
+      --surface: #fff;
+      --ink: #17243b;
+      --muted: #748199;
+      --line: #e8ecf3;
+      --blue: #4169e1;
+      --blue-hover: #3158d1;
+      --blue-pale: #edf2ff;
+      --red: #cb4856;
+      --green: #16815f;
+      --shadow: 0 14px 38px rgb(29 45 77 / 5%);
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body {
+      min-width: 300px;
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.5 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input { font: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, input:focus-visible, a:focus-visible {
+      outline: 3px solid rgb(65 105 225 / 25%);
+      outline-offset: 2px;
+    }
+
+    .topbar {
+      height: 66px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 max(24px, calc((100vw - 1160px) / 2));
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .brand { display: flex; align-items: center; gap: 11px; font-weight: 750; letter-spacing: -.035em; }
+    .brand-mark {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 10px;
+      background: var(--blue);
+      color: white;
+    }
+    .brand-mark svg { width: 19px; height: 19px; }
+    .brand-sub { color: var(--muted); font-weight: 500; }
+    .service-label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 3px var(--blue-pale); }
+
+    main { max-width: 1160px; margin: 0 auto; padding: 38px 24px 56px; }
+    .page-heading { margin-bottom: 24px; }
+    .eyebrow { margin: 0 0 7px; color: var(--blue); font-size: 10px; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(25px, 4vw, 32px); letter-spacing: -.045em; line-height: 1.2; }
+    .page-description { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+
+    .summary { display: flex; align-items: center; gap: 9px; margin-bottom: 20px; }
+    .summary-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 11px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      color: #627089;
+      font-size: 11px;
+    }
+    .summary-chip strong { color: var(--ink); font-size: 12px; }
+
+    .layout { display: grid; grid-template-columns: minmax(270px, .78fr) minmax(0, 1.22fr); gap: 18px; align-items: start; }
+    .panel { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); box-shadow: var(--shadow); }
+    .panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 20px 16px; }
+    .panel-title { margin: 0; font-size: 15px; font-weight: 720; letter-spacing: -.02em; }
+    .panel-help { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
+    .counter { display: grid; min-width: 26px; height: 26px; padding: 0 7px; place-items: center; border-radius: 20px; background: #f0f3f8; color: #63718a; font-size: 11px; font-weight: 700; }
+    .create-form { display: flex; gap: 8px; padding: 0 20px 17px; }
+    .input {
+      width: 100%;
+      min-width: 0;
+      height: 39px;
+      padding: 0 11px;
+      border: 1px solid #dfe5ee;
+      border-radius: 7px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 12px;
+    }
+    .input::placeholder { color: #9aa5b7; }
+    .input:focus { border-color: #92a9f1; outline: 0; box-shadow: 0 0 0 3px rgb(65 105 225 / 9%); }
+    .button {
+      display: inline-flex;
+      min-height: 34px;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 10px;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      background: transparent;
+      color: #637089;
+      font-size: 11px;
+      font-weight: 650;
+      text-decoration: none;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: background .14s, color .14s, border-color .14s;
+    }
+    .button svg { width: 14px; height: 14px; }
+    .button:hover { background: #f1f4f9; color: var(--ink); }
+    .button-primary { min-height: 39px; padding: 0 13px; background: var(--blue); color: white; }
+    .button-primary:hover { background: var(--blue-hover); color: white; }
+    .button-danger { color: var(--red); }
+    .button-danger:hover { background: #fff0f1; color: #b63341; }
+    .button:disabled { cursor: wait; opacity: .55; }
+    .list-toolbar { display: flex; align-items: center; justify-content: space-between; min-height: 40px; padding: 0 14px 0 20px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #fbfcfe; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .04em; }
+    .list { margin: 0; padding: 0; list-style: none; }
+    .bucket-row, .object-row { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 12px 20px; border-bottom: 1px solid #f0f2f6; }
+    .object-row { flex-wrap: wrap; }
+    .bucket-row:last-child, .object-row:last-child { border-bottom: 0; }
+    .bucket-row.is-selected { background: #f7f9ff; }
+    .bucket-info, .object-info { display: flex; min-width: 0; align-items: center; gap: 10px; }
+    .item-icon { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border: 1px solid #e9edf4; border-radius: 9px; background: #fafbfe; color: #75839b; }
+    .item-icon svg { width: 17px; height: 17px; }
+    .item-details { min-width: 0; }
+    .item-name { overflow: hidden; color: var(--ink); font-size: 12px; font-weight: 680; text-overflow: ellipsis; white-space: nowrap; }
+    .item-meta { margin-top: 2px; color: var(--muted); font-size: 10px; }
+    .row-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 2px; }
+    .ocr-result { min-width: 0; flex: 1 1 100%; margin-left: 44px; padding: 10px 12px; border: 1px solid #e7ebf2; border-radius: 8px; background: #fbfcff; color: #53617a; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+    .ocr-result.error { border-color: #f0c7cc; background: #fff8f8; color: #a83441; }
+    .ocr-result pre { max-height: 240px; margin: 6px 0 0; overflow: auto; font: inherit; }
+
+    .objects-title-wrap { min-width: 0; }
+    .active-bucket { display: inline-flex; max-width: 100%; align-items: center; gap: 6px; margin-top: 8px; padding: 4px 8px; border-radius: 6px; background: var(--blue-pale); color: #3157bd; font-size: 10px; font-weight: 650; }
+    .active-bucket span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .object-tools { display: flex; align-items: center; gap: 8px; padding: 0 20px 15px; }
+    .search-wrap { position: relative; min-width: 0; flex: 1; }
+    .search-wrap svg { position: absolute; top: 12px; left: 10px; width: 14px; height: 14px; color: #8995a9; pointer-events: none; }
+    .search-input { padding-left: 31px; }
+    .upload-area { margin: 0 20px 16px; padding: 12px; border: 1px dashed #d7deeb; border-radius: 9px; background: #fbfcff; }
+    .upload-row { display: flex; align-items: center; gap: 9px; }
+    .file-input { min-width: 0; flex: 1; color: var(--muted); font-size: 10px; }
+    .file-input::file-selector-button { margin-right: 8px; padding: 6px 9px; border: 1px solid #e1e6ef; border-radius: 6px; background: white; color: #53617a; font: inherit; font-weight: 650; cursor: pointer; }
+    .key-input { height: 34px; margin-top: 9px; font-size: 11px; }
+    .file-hint { margin: 7px 0 0; color: #8a96aa; font-size: 10px; }
+    .empty-state { display: grid; min-height: 180px; align-content: center; justify-items: center; padding: 20px; color: var(--muted); text-align: center; }
+    .empty-icon { display: grid; width: 46px; height: 46px; margin-bottom: 10px; place-items: center; border-radius: 14px; background: #f3f5fa; color: #8b97aa; }
+    .empty-icon svg { width: 21px; height: 21px; }
+    .empty-state strong { color: #4f5d74; font-size: 12px; }
+    .empty-state p { max-width: 250px; margin: 4px 0 0; font-size: 11px; }
+    .loading { padding: 20px; color: var(--muted); font-size: 11px; }
+    .toast-region { position: fixed; z-index: 5; right: 18px; bottom: 18px; display: grid; gap: 8px; }
+    .toast { max-width: min(380px, calc(100vw - 36px)); padding: 11px 14px; border: 1px solid #f0c7cc; border-radius: 9px; background: white; box-shadow: 0 9px 28px rgb(29 45 77 / 12%); color: #a83441; font-size: 12px; }
+    .toast.success { border-color: #c7e8dc; color: var(--green); }
+
+    @media (max-width: 760px) {
+      .topbar { height: 59px; padding: 0 17px; }
+      main { padding: 28px 17px 40px; }
+      .layout { grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (max-width: 430px) {
+      .service-label { font-size: 0; }
+      .summary { flex-wrap: wrap; }
+      .panel-header { padding: 17px 15px 14px; }
+      .create-form { padding: 0 15px 15px; }
+      .list-toolbar { padding-left: 15px; }
+      .bucket-row, .object-row { padding-right: 9px; padding-left: 13px; }
+      .bucket-row { align-items: flex-start; }
+      .bucket-row .row-actions { flex-direction: column; align-items: stretch; }
+      .object-tools { padding-right: 15px; padding-left: 15px; }
+      .upload-area { margin-right: 15px; margin-left: 15px; }
+      .upload-row { align-items: stretch; flex-direction: column; }
+      .upload-row .button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m4.5 7.8 7.5 4.4 7.5-4.4M12 12.2V20" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+      </span>
+      <span>Cloud Storage <span class="brand-sub">/ S3 Lab</span></span>
+    </div>
+    <div class="service-label"><span class="status-dot" aria-hidden="true"></span>Yandex Cloud · S3 API</div>
+  </header>
+
+  <main>
+    <div class="page-heading">
+      <p class="eyebrow">Object storage</p>
+      <h1>Файлы под контролем</h1>
+      <p class="page-description">Создавайте хранилища, загружайте объекты и управляйте ими в одном месте.</p>
+    </div>
+
+    <div class="summary" aria-label="Сводка">
+      <span class="summary-chip"><strong id="bucket-total">—</strong> bucket’ов</span>
+      <span class="summary-chip"><strong id="object-total">—</strong> объектов <span id="object-total-context">в выбранном bucket</span></span>
+    </div>
+
+    <div class="layout">
+      <section class="panel" aria-labelledby="buckets-heading">
+        <div class="panel-header">
+          <div><h2 class="panel-title" id="buckets-heading">Хранилища</h2><p class="panel-help">Ваши S3 bucket’ы</p></div>
+          <span class="counter" id="bucket-count">0</span>
+        </div>
+        <form class="create-form" id="bucket-form">
+          <input class="input" id="bucket-name" name="name" placeholder="Например, photos-2026" aria-label="Имя нового bucket’а" minlength="3" maxlength="63" pattern="[a-z0-9][a-z0-9\-]{1,61}[a-z0-9]" title="3–63 символа: строчные латинские буквы, цифры и дефис" required>
+          <button class="button button-primary" id="create-bucket-button" type="submit">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Создать
+          </button>
+        </form>
+        <div class="list-toolbar">
+          <span>BUCKET’Ы</span>
+          <button class="button" id="refresh-buckets" type="button" aria-label="Обновить список bucket’ов">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 7v5h-5M4.8 9a7.5 7.5 0 0 1 12.7-2L20 12M4 17v-5h5m10.2 3a7.5 7.5 0 0 1-12.7 2L4 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Обновить
+          </button>
+        </div>
+        <ul class="list" id="buckets" aria-live="polite"></ul>
+      </section>
+
+      <section class="panel" aria-labelledby="objects-heading">
+        <div class="panel-header">
+          <div class="objects-title-wrap">
+            <h2 class="panel-title" id="objects-heading">Объекты</h2>
+            <p class="panel-help">Содержимое выбранного хранилища</p>
+            <div class="active-bucket" id="active-bucket" hidden><span aria-hidden="true">◆</span><span id="current-bucket"></span></div>
+          </div>
+          <button class="button" id="refresh-objects" type="button" aria-label="Обновить список объектов" hidden>
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 7v5h-5M4.8 9a7.5 7.5 0 0 1 12.7-2L20 12M4 17v-5h5m10.2 3a7.5 7.5 0 0 1-12.7 2L4 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div id="object-workspace">
+          <div class="empty-state">
+            <span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 8.5h16v11H4zM3 5h18v3.5H3z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M10 12h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+            <strong>Выберите хранилище</strong>
+            <p>Содержимое bucket’а и загрузка файлов появятся здесь.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    let selectedBucket = null;
+    let allObjects = [];
+    const ocrOperations = new Map();
+    const OCR_POLL_INTERVAL_MS = 2000;
+    const OCR_POLL_TIMEOUT_MS = 5 * 60 * 1000;
+
+    const bucketIcon = '<svg viewBox="0 0 24 24" fill="none"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m4.5 7.8 7.5 4.4 7.5-4.4M12 12.2V20" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
+    const fileIcon = '<svg viewBox="0 0 24 24" fill="none"><path d="M6 3.8h8l4 4V20H6V3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 4v4h4M9 13h6M9 16.5h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const eyeIcon = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg>';
+    const downloadIcon = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 17v3h14v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const deleteIcon = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const searchIcon = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+
+    function showToast(message, success = false) {
+      const toast = document.createElement('div');
+      toast.className = success ? 'toast success' : 'toast';
+      toast.textContent = message;
+      $('toast-region').append(toast);
+      window.setTimeout(() => toast.remove(), 4500);
+    }
+
+    async function api(path, options = {}) {
+      let response;
+      try {
+        response = await fetch(path, options);
+      } catch (error) {
+        showToast('Не удалось связаться с приложением. Проверьте подключение.');
+        throw error;
+      }
+      if (!response.ok) {
+        let message = `HTTP ${response.status}`;
+        try {
+          const body = await response.json();
+          message = body.detail || message;
+        } catch {}
+        showToast(`Не удалось выполнить операцию: ${message}`);
+        throw new Error(message);
+      }
+      const contentType = response.headers.get('content-type') || '';
+      return contentType.includes('application/json') ? response.json() : response;
+    }
+
+    function icon(markup) {
+      const element = document.createElement('span');
+      element.className = 'item-icon';
+      element.setAttribute('aria-hidden', 'true');
+      element.innerHTML = markup;
+      return element;
+    }
+
+    function button(label, className, action, markup = '') {
+      const element = document.createElement('button');
+      element.type = 'button';
+      element.className = `button ${className}`;
+      element.setAttribute('aria-label', label);
+      if (markup) element.insertAdjacentHTML('afterbegin', markup);
+      const text = document.createElement('span');
+      text.textContent = label;
+      element.append(text);
+      element.addEventListener('click', action);
+      return element;
+    }
+
+    function emptyState(title, description, markup = fileIcon) {
+      const item = document.createElement('li');
+      item.className = 'empty-state';
+      const graphic = document.createElement('span');
+      graphic.className = 'empty-icon';
+      graphic.setAttribute('aria-hidden', 'true');
+      graphic.innerHTML = markup;
+      const heading = document.createElement('strong');
+      heading.textContent = title;
+      const copy = document.createElement('p');
+      copy.textContent = description;
+      item.append(graphic, heading, copy);
+      return item;
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return `${bytes} Б`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
+      if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} МБ`;
+      return `${(bytes / 1024 ** 3).toFixed(1)} ГБ`;
+    }
+
+    function formatDate(value) {
+      if (!value) return 'дата неизвестна';
+      const date = new Date(value);
+      return Number.isNaN(date.getTime())
+        ? value
+        : new Intl.DateTimeFormat('ru-RU', {dateStyle: 'medium'}).format(date);
+    }
+
+    function objectUrl(key, download = false) {
+      const path = key.split('/').map(encodeURIComponent).join('/');
+      const url = `/buckets/${encodeURIComponent(selectedBucket)}/objects/${path}`;
+      return download ? `${url}?download=true` : url;
+    }
+
+    async function loadBuckets() {
+      const list = $('buckets');
+      list.replaceChildren(Object.assign(document.createElement('li'), {
+        className: 'loading',
+        textContent: 'Загружаем хранилища…',
+      }));
+      $('refresh-buckets').disabled = true;
+      try {
+        const data = await api('/buckets');
+        $('bucket-total').textContent = data.count ?? data.buckets.length;
+        $('bucket-count').textContent = data.count ?? data.buckets.length;
+        if (selectedBucket && !data.buckets.some(item => item.name === selectedBucket)) {
+          selectedBucket = null;
+          allObjects = [];
+          renderObjects();
+        }
+        if (!data.buckets.length) {
+          list.replaceChildren(emptyState('Bucket’ов пока нет', 'Создайте первое хранилище с помощью формы выше.', bucketIcon));
+          return;
+        }
+
+        const rows = data.buckets.map(bucket => {
+          const row = document.createElement('li');
+          row.className = `bucket-row${bucket.name === selectedBucket ? ' is-selected' : ''}`;
+          const info = document.createElement('div');
+          info.className = 'bucket-info';
+          info.append(icon(bucketIcon));
+          const details = document.createElement('div');
+          details.className = 'item-details';
+          const name = document.createElement('div');
+          name.className = 'item-name';
+          name.textContent = bucket.name;
+          const date = document.createElement('div');
+          date.className = 'item-meta';
+          date.textContent = `Создан ${formatDate(bucket.creation_date)}`;
+          details.append(name, date);
+          info.append(details);
+
+          const actions = document.createElement('div');
+          actions.className = 'row-actions';
+          actions.append(
+            button('Открыть', '', () => selectBucket(bucket.name)),
+            button('Удалить', 'button-danger', () => deleteBucket(bucket.name), deleteIcon),
+          );
+          row.append(info, actions);
+          return row;
+        });
+        list.replaceChildren(...rows);
+      } catch {
+        list.replaceChildren(emptyState('Не удалось загрузить bucket’ы', 'Проверьте подключение и попробуйте обновить список.', bucketIcon));
+      } finally {
+        $('refresh-buckets').disabled = false;
+      }
+    }
+
+    async function createBucket(event) {
+      event.preventDefault();
+      const name = $('bucket-name').value.trim();
+      const submit = $('create-bucket-button');
+      submit.disabled = true;
+      try {
+        await api('/buckets', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name}),
+        });
+        $('bucket-name').value = '';
+        showToast(`Bucket «${name}» создан`, true);
+        await loadBuckets();
+        await selectBucket(name);
+      } catch {
+        // The API helper already displays an error message.
+      } finally {
+        submit.disabled = false;
+      }
+    }
+
+    async function deleteBucket(name) {
+      if (!confirm(`Удалить bucket «${name}» вместе со всеми его объектами?`)) return;
+      try {
+        await api(`/buckets/${encodeURIComponent(name)}`, {method: 'DELETE'});
+        if (selectedBucket === name) {
+          selectedBucket = null;
+          allObjects = [];
+          renderObjects();
+        }
+        showToast(`Bucket «${name}» удалён`, true);
+        await loadBuckets();
+      } catch {
+        // The API helper already displays an error message.
+      }
+    }
+
+    async function selectBucket(name) {
+      if (selectedBucket !== name) ocrOperations.clear();
+      selectedBucket = name;
+      allObjects = [];
+      $('current-bucket').textContent = name;
+      $('active-bucket').hidden = false;
+      $('refresh-objects').hidden = false;
+      $('object-total').textContent = '…';
+      $('object-total-context').textContent = `в ${name}`;
+      await loadObjects();
+      renderBucketsSelection();
+    }
+
+    function renderBucketsSelection() {
+      for (const row of $('buckets').querySelectorAll('.bucket-row')) {
+        row.classList.toggle('is-selected', row.querySelector('.item-name')?.textContent === selectedBucket);
+      }
+    }
+
+    async function loadObjects() {
+      if (!selectedBucket) {
+        $('object-total').textContent = '—';
+        $('object-total-context').textContent = 'в выбранном bucket';
+        $('refresh-objects').hidden = true;
+        $('active-bucket').hidden = true;
+        $('object-workspace').replaceChildren(emptyState(
+          'Выберите хранилище',
+          'Содержимое bucket’а и загрузка файлов появятся здесь.',
+          bucketIcon,
+        ));
+        return;
+      }
+
+      const bucket = selectedBucket;
+      $('refresh-objects').disabled = true;
+      $('object-workspace').replaceChildren(Object.assign(document.createElement('div'), {
+        className: 'loading',
+        textContent: 'Загружаем объекты…',
+      }));
+      try {
+        const data = await api(`/buckets/${encodeURIComponent(bucket)}/objects`);
+        if (bucket !== selectedBucket) return;
+        allObjects = data.objects;
+        $('object-total').textContent = data.count ?? data.objects.length;
+        renderObjects();
+      } catch {
+        if (bucket === selectedBucket) {
+          $('object-total').textContent = '—';
+          $('object-workspace').replaceChildren(emptyState(
+            'Не удалось загрузить объекты',
+            'Проверьте подключение и попробуйте обновить список.',
+          ));
+        }
+      } finally {
+        $('refresh-objects').disabled = false;
+      }
+    }
+
+    function renderObjects() {
+      if (!selectedBucket) {
+        $('object-total').textContent = '—';
+        $('object-total-context').textContent = 'в выбранном bucket';
+        $('refresh-objects').hidden = true;
+        $('active-bucket').hidden = true;
+        $('object-workspace').replaceChildren(emptyState(
+          'Выберите хранилище',
+          'Содержимое bucket’а и загрузка файлов появятся здесь.',
+          bucketIcon,
+        ));
+        return;
+      }
+
+      $('active-bucket').hidden = false;
+      $('refresh-objects').hidden = false;
+      $('current-bucket').textContent = selectedBucket;
+      $('object-total-context').textContent = `в ${selectedBucket}`;
+
+      const tools = document.createElement('div');
+      tools.className = 'object-tools';
+      const search = document.createElement('label');
+      search.className = 'search-wrap';
+      const searchInput = document.createElement('input');
+      searchInput.className = 'input search-input';
+      searchInput.id = 'object-search';
+      searchInput.type = 'search';
+      searchInput.placeholder = 'Найти объект…';
+      searchInput.setAttribute('aria-label', 'Найти объект');
+      search.insertAdjacentHTML('afterbegin', searchIcon);
+      search.append(searchInput);
+      tools.append(search);
+
+      const uploadForm = document.createElement('form');
+      uploadForm.className = 'upload-area';
+      uploadForm.id = 'upload-form';
+      const uploadRow = document.createElement('div');
+      uploadRow.className = 'upload-row';
+      const fileInput = document.createElement('input');
+      fileInput.className = 'file-input';
+      fileInput.id = 'file-input';
+      fileInput.type = 'file';
+      fileInput.setAttribute('aria-label', 'Выберите файл');
+      fileInput.required = true;
+      const uploadButton = document.createElement('button');
+      uploadButton.className = 'button button-primary';
+      uploadButton.type = 'submit';
+      uploadButton.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15.5v4h14v-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Загрузить</span>';
+      uploadRow.append(fileInput, uploadButton);
+      const keyInput = document.createElement('input');
+      keyInput.className = 'input key-input';
+      keyInput.id = 'object-key';
+      keyInput.type = 'text';
+      keyInput.placeholder = 'Ключ объекта (необязательно, по умолчанию — имя файла)';
+      keyInput.setAttribute('aria-label', 'Пользовательский ключ объекта');
+      const hint = document.createElement('p');
+      hint.className = 'file-hint';
+      hint.textContent = 'Можно загрузить файл размером до 50 МБ.';
+      uploadForm.append(uploadRow, keyInput, hint);
+      uploadForm.addEventListener('submit', uploadObject);
+
+      const list = document.createElement('ul');
+      list.className = 'list';
+      list.id = 'objects';
+      list.setAttribute('aria-live', 'polite');
+      const content = document.createElement('div');
+      content.append(tools, uploadForm, list);
+      $('object-workspace').replaceChildren(content);
+      searchInput.addEventListener('input', () => renderObjectRows(searchInput.value));
+      renderObjectRows('');
+    }
+
+    function renderObjectRows(query) {
+      const list = $('objects');
+      if (!list) return;
+      const normalizedQuery = query.trim().toLocaleLowerCase('ru');
+      const objects = allObjects.filter(item => item.key.toLocaleLowerCase('ru').includes(normalizedQuery));
+      if (!allObjects.length) {
+        list.replaceChildren(emptyState('Здесь пока пусто', 'Выберите файл выше, чтобы загрузить первый объект.'));
+        return;
+      }
+      if (!objects.length) {
+        list.replaceChildren(emptyState('Ничего не найдено', 'Попробуйте изменить поисковый запрос.'));
+        return;
+      }
+
+      const rows = objects.map(object => {
+        const row = document.createElement('li');
+        row.className = 'object-row';
+        const info = document.createElement('div');
+        info.className = 'object-info';
+        info.append(icon(fileIcon));
+        const details = document.createElement('div');
+        details.className = 'item-details';
+        const name = document.createElement('div');
+        name.className = 'item-name';
+        name.textContent = object.key;
+        name.title = object.key;
+        const meta = document.createElement('div');
+        meta.className = 'item-meta';
+        meta.textContent = formatSize(object.size);
+        details.append(name, meta);
+        info.append(details);
+
+        const actions = document.createElement('div');
+        actions.className = 'row-actions';
+        const open = document.createElement('a');
+        open.className = 'button';
+        open.href = objectUrl(object.key);
+        open.target = '_blank';
+        open.rel = 'noopener noreferrer';
+        open.setAttribute('aria-label', `Просмотреть ${object.key}`);
+        open.innerHTML = `${eyeIcon}<span>Просмотр</span>`;
+        const download = document.createElement('a');
+        download.className = 'button';
+        download.href = objectUrl(object.key, true);
+        download.setAttribute('aria-label', `Скачать ${object.key}`);
+        download.innerHTML = `${downloadIcon}<span>Скачать</span>`;
+        actions.append(open, download, button('Удалить', 'button-danger', () => deleteObject(object.key), deleteIcon));
+        const operation = ocrOperations.get(object.key);
+        const ocrButton = button('Распознать текст', '', () => recognizeObject(object.key));
+        ocrButton.disabled = Boolean(operation?.loading);
+        if (operation?.loading) ocrButton.querySelector('span').textContent = 'Распознаём…';
+        actions.append(ocrButton);
+        row.append(info, actions);
+        if (operation) row.append(renderOCRResult(operation));
+        return row;
+      });
+      list.replaceChildren(...rows);
+    }
+
+    function renderOCRResult(operation) {
+      const result = document.createElement('div');
+      result.className = `ocr-result${operation.error ? ' error' : ''}`;
+
+      if (operation.loading) {
+        result.textContent = 'Отправляем изображение на распознавание…';
+        return result;
+      }
+      if (typeof operation.error === 'string') {
+        result.textContent = operation.error;
+        return result;
+      }
+      if (!operation.id) return result;
+
+      if (operation.errorMessage) {
+        result.classList.add('error');
+        result.textContent = `Ошибка распознавания: ${operation.errorMessage}`;
+        return result;
+      }
+      if (!operation.done) {
+        result.textContent = `Распознавание выполняется${operation.id ? ` (ID операции: ${operation.id})` : ''}…`;
+        return result;
+      }
+
+      const recognizedText = extractOCRText(operation.response);
+      const annotatedImageKey = operation.response?.recognizedImageKey;
+      result.append(document.createTextNode(
+        recognizedText || 'Распознавание завершено, но текст в ответе отсутствует.',
+      ));
+      if (typeof annotatedImageKey === 'string') {
+        const imageLink = document.createElement('a');
+        imageLink.className = 'button';
+        imageLink.href = objectUrl(annotatedImageKey);
+        imageLink.target = '_blank';
+        imageLink.rel = 'noopener noreferrer';
+        imageLink.textContent = `Открыть изображение с рамками (${annotatedImageKey})`;
+        result.append(document.createElement('br'), imageLink);
+      }
+      return result;
+    }
+
+    function extractOCRText(payload, depth = 0) {
+      if (!payload || typeof payload !== 'object' || depth > 5) return '';
+
+      const annotation = payload.textAnnotation || payload.text_annotation;
+      const text = annotation?.fullText || annotation?.full_text || annotation?.markdown;
+      if (typeof text === 'string' && text.trim()) return text.trim();
+
+      const directText = payload.fullText || payload.full_text || payload.markdown;
+      if (typeof directText === 'string' && directText.trim()) return directText.trim();
+
+      for (const key of ['response', 'result', 'data', 'recognition']) {
+        const nestedText = extractOCRText(payload[key], depth + 1);
+        if (nestedText) return nestedText;
+      }
+      return '';
+    }
+
+    async function recognizeObject(key) {
+      const bucket = selectedBucket;
+      if (!bucket) return;
+
+      const previous = ocrOperations.get(key);
+      if (previous?.loading) return;
+      ocrOperations.set(key, {loading: true, done: false});
+      renderObjectRows($('object-search')?.value || '');
+
+      try {
+        const operation = await api(`/buckets/${encodeURIComponent(bucket)}/recognitions`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({objectKey: key}),
+        });
+        if (selectedBucket !== bucket) return;
+
+        if (operation.done) {
+          ocrOperations.set(key, {
+            ...operation,
+            errorMessage: operation.error?.message,
+          });
+        } else if (operation.id) {
+          ocrOperations.set(key, {...operation, loading: true});
+          renderObjectRows($('object-search')?.value || '');
+
+          const deadline = Date.now() + OCR_POLL_TIMEOUT_MS;
+          while (selectedBucket === bucket && Date.now() < deadline) {
+            await new Promise(resolve => window.setTimeout(resolve, OCR_POLL_INTERVAL_MS));
+            if (selectedBucket !== bucket) return;
+
+            const params = new URLSearchParams({bucketName: bucket, objectKey: key});
+            const result = await api(
+              `/recognitions/${encodeURIComponent(operation.id)}?${params.toString()}`,
+            );
+            if (selectedBucket !== bucket) return;
+            ocrOperations.set(key, {
+              id: operation.id,
+              done: true,
+              response: result,
+            });
+            break;
+          }
+
+          if (selectedBucket === bucket && !ocrOperations.get(key)?.done) {
+            throw new Error('Превышено время ожидания результата OCR. Попробуйте запустить распознавание ещё раз.');
+          }
+        } else {
+          throw new Error('Yandex OCR не вернул ID асинхронной операции.');
+        }
+      } catch (error) {
+        if (selectedBucket === bucket) {
+          ocrOperations.set(key, {
+            ...previous,
+            loading: false,
+            error: error instanceof Error ? error.message : 'Не удалось выполнить распознавание.',
+          });
+        }
+      }
+
+      if (selectedBucket === bucket) {
+        const current = ocrOperations.get(key);
+        if (current) ocrOperations.set(key, {...current, loading: false});
+      }
+      if (selectedBucket === bucket) renderObjectRows($('object-search')?.value || '');
+    }
+
+    async function uploadObject(event) {
+      event.preventDefault();
+      const file = $('file-input').files[0];
+      if (!file || !selectedBucket) return;
+      if (file.size > 50 * 1024 * 1024) {
+        showToast('Размер файла превышает ограничение в 50 МБ.');
+        return;
+      }
+      const bucket = selectedBucket;
+      const form = new FormData();
+      form.append('file', file);
+      const key = $('object-key').value.trim();
+      if (key) form.append('key', key);
+      const submit = $('upload-form').querySelector('button[type="submit"]');
+      submit.disabled = true;
+      try {
+        await api(`/buckets/${encodeURIComponent(bucket)}/objects`, {method: 'POST', body: form});
+        ocrOperations.delete(key || file.name);
+        $('upload-form').reset();
+        showToast(`Файл «${file.name}» загружен`, true);
+        if (selectedBucket === bucket) await loadObjects();
+      } catch {
+        // The API helper already displays an error message.
+      } finally {
+        submit.disabled = false;
+      }
+    }
+
+    async function deleteObject(key) {
+      if (!confirm(`Удалить объект «${key}»?`)) return;
+      const bucket = selectedBucket;
+      const path = key.split('/').map(encodeURIComponent).join('/');
+      try {
+        await api(`/buckets/${encodeURIComponent(bucket)}/objects/${path}`, {method: 'DELETE'});
+        ocrOperations.delete(key);
+        showToast(`Объект «${key}» удалён`, true);
+        if (selectedBucket === bucket) await loadObjects();
+      } catch {
+        // The API helper already displays an error message.
+      }
+    }
+
+    $('bucket-form').addEventListener('submit', createBucket);
+    $('refresh-buckets').addEventListener('click', loadBuckets);
+    $('refresh-objects').addEventListener('click', loadObjects);
+    loadBuckets();
+  </script>
+</body>
+</html>

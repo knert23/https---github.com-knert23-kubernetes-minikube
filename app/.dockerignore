@@ -1,0 +1,13 @@
+.git
+.gitignore
+.idea
+.vscode
+__pycache__/
+*.pyc
+.venv/
+venv/
+.dockerignore
+Dockerfile
+.env
+.env.*
+authorized_key.json

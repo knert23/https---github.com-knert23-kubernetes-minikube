@@ -1,0 +1,9 @@
+PyJWT
+cryptography
+yandexcloud
+fastapi
+uvicorn
+requests
+python-multipart
+python-dotenv
+Pillow

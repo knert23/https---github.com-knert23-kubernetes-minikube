@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lab4-kubernetes-config
+data:
+  S3_ENDPOINT_URL: "https://storage.yandexcloud.net"
+  VISION_OCR_ENDPOINT_URL: "https://ai.api.cloud.yandex.net"

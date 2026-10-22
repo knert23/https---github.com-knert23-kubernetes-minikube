@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lab4-kubernetes-app
+  labels:
+    app: lab4-kubernetes-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lab4-kubernetes-app
+  template:
+    metadata:
+      labels:
+        app: lab4-kubernetes-app
+    spec:
+      containers:
+        - name: app
+          image: lab4-kubernetes-app:local
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: lab4-kubernetes-config
+            - secretRef:
+                name: lab4-kubernetes-credentials
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

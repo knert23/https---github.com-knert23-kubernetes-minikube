@@ -1,0 +1,10 @@
+.env
+app/.env.k8s-secret
+authorized_key.json
+.idea
+.vscode
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
